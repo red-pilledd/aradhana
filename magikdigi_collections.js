@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 // Aradhana Cable Network - Collections Script
 // Accounts: K02C001, K02C005, K02C006, K02C007, K02C008, K02C014
@@ -10,15 +10,15 @@
 
 /**
  * magikdigi_collections.js
- * Daily collections scraper — Cable (digi.kccl.tv) + Internet (Kerala Vision)
- * Run daily at 6 PM via Task Scheduler.  Window: yesterday 18:00 → today 18:00.
+ * Daily collections scraper â€” Cable (digi.kccl.tv) + Internet (Kerala Vision)
+ * Run daily at 6 PM via Task Scheduler.  Window: yesterday 18:00 â†’ today 18:00.
  *
  * node magikdigi_collections.js            # default window
  * node magikdigi_collections.js --headed   # show browser
  * node magikdigi_collections.js --kv-only  # skip cable, KV only
  * node magikdigi_collections.js --date DD-MM-YYYY       # full calendar day
  * node magikdigi_collections.js --from DD-MM-YYYY --to DD-MM-YYYY
- * node magikdigi_collections.js --today    # midnight → now
+ * node magikdigi_collections.js --today    # midnight â†’ now
  */
 
 const { chromium }    = require('playwright');
@@ -29,12 +29,12 @@ const path             = require('path');
 const { ImapFlow }     = require('imapflow');
 const { simpleParser } = require('mailparser');
 
-// ── Credentials ───────────────────────────────────────────────────────────────
+// â”€â”€ Credentials â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || 'REPLACE_WITH_YOUR_KEY';
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || 'REPLACE_WITH_APP_PASSWORD';
 
-// ── Cable config ──────────────────────────────────────────────────────────────
+// â”€â”€ Cable config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const CABLE_BASE       = 'https://digi.kccl.tv';
 const CABLE_LOGIN_URL  = `${CABLE_BASE}/index.php`;
@@ -42,7 +42,7 @@ const CABLE_COLL_URL   = `${CABLE_BASE}/index.php/reports/allcollections`;
 const CABLE_ACCOUNTS   = ['K02C001', 'K02C005', 'K02C006', 'K02C007', 'K02C008', 'K02C014'];
 const CABLE_PASSWORD   = 'Aradhana@123#';
 
-// ── Kerala Vision config ──────────────────────────────────────────────────────
+// â”€â”€ Kerala Vision config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const KV_BASE       = 'https://operator.keralavisionisp.com/Partner';
 const KV_LOGIN_URL  = `${KV_BASE}/Default.aspx`;
@@ -54,19 +54,19 @@ const KV_ACCOUNTS = [
   { user: 'KB02C006', pass: 'KB02c006'      },
 ];
 
-// ── Email config ──────────────────────────────────────────────────────────────
+// â”€â”€ Email config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const EMAIL_FROM = 'shibn88@gmail.com';
 const EMAIL_TO   = 'shabup63@gmail.com';
 
-// ── WhatsApp config ───────────────────────────────────────────────────────────
+// â”€â”€ WhatsApp config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const WA_PHONES = [
   '918281871096',   // Bibin (Brother)
   '918907093184',   // Dad (Shanmughadas)
 ];
 
-// ── HDFC account labels (last 4 digits → display name) ───────────────────────
+// â”€â”€ HDFC account labels (last 4 digits â†’ display name) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Add Bibin's and Sheeja's account last-4 here once known from the first run
 const HDFC_ACCOUNTS = {
   '6380': 'Shibin',
@@ -74,22 +74,22 @@ const HDFC_ACCOUNTS = {
   '7482': 'Bibin (Brother)',
 };
 
-// ── Output ────────────────────────────────────────────────────────────────────
+// â”€â”€ Output â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const CSV_PATH = 'C:\\Users\\shibz\\Documents\\aradhana\\collections_today.csv';
 
-// ── Runtime flags ─────────────────────────────────────────────────────────────
+// â”€â”€ Runtime flags â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const HEADED  = process.argv.includes('--headed');
 const KV_ONLY = process.argv.includes('--kv-only');
 
-// ── Anthropic client ──────────────────────────────────────────────────────────
+// â”€â”€ Anthropic client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ai = new Anthropic({ apiKey: ANTHROPIC_KEY });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // DATE RANGE
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function argVal(flag) {
   const i = process.argv.indexOf(flag);
@@ -98,7 +98,7 @@ function argVal(flag) {
 
 function parseDMY(str) {
   const m = str && str.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-  if (!m) throw new Error(`Bad date "${str}" — need DD-MM-YYYY`);
+  if (!m) throw new Error(`Bad date "${str}" â€” need DD-MM-YYYY`);
   return new Date(+m[3], +m[2] - 1, +m[1]);
 }
 
@@ -113,7 +113,7 @@ function getDateRange() {
     const ws = new Date(now); ws.setHours(0,0,0,0);
     return { fromDMY:dmy(ws), toDMY:dmy(now), fromKV:kvFmt(ws), toKV:kvFmt(now),
              windowStart:ws, windowEnd:new Date(now),
-             label:`${dmy(ws)} 00:00 → ${dmy(now)} ${hm(now)}`, subject:`${dmy(now)} today` };
+             label:`${dmy(ws)} 00:00 â†’ ${dmy(now)} ${hm(now)}`, subject:`${dmy(now)} today` };
   }
 
   const dateArg = argVal('--date');
@@ -134,25 +134,25 @@ function getDateRange() {
     const we = new Date(td); we.setHours(18,0,0,0);
     return { fromDMY:dmy(fd), toDMY:dmy(td), fromKV:kvFmt(fd), toKV:kvFmt(td),
              windowStart:ws, windowEnd:we,
-             label:`${dmy(fd)} 18:00 → ${dmy(td)} 18:00`, subject:`${dmy(fd)} → ${dmy(td)}` };
+             label:`${dmy(fd)} 18:00 â†’ ${dmy(td)} 18:00`, subject:`${dmy(fd)} â†’ ${dmy(td)}` };
   }
 
-  // Default: yesterday 18:00 → today 18:00
+  // Default: yesterday 18:00 â†’ today 18:00
   const today = new Date(now);
   const yest  = new Date(now); yest.setDate(yest.getDate() - 1);
   const ws = new Date(yest); ws.setHours(18,0,0,0);
   const we = new Date(today); we.setHours(18,0,0,0);
   return { fromDMY:dmy(yest), toDMY:dmy(today), fromKV:kvFmt(yest), toKV:kvFmt(today),
            windowStart:ws, windowEnd:we,
-           label:`${dmy(yest)} 18:00 → ${dmy(today)} 18:00`, subject:`${dmy(yest)} → ${dmy(today)}` };
+           label:`${dmy(yest)} 18:00 â†’ ${dmy(today)} 18:00`, subject:`${dmy(yest)} â†’ ${dmy(today)}` };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function inr(n) {
-  return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  return 'â‚¹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 }
 
 function escapeCSV(val) {
@@ -176,7 +176,7 @@ function filterByWindow(rows, dateColIdx, windowStart, windowEnd) {
   let kept=0, dropped=0;
   const out = rows.filter(row => {
     const d = parseDate(row[dateColIdx] ?? '');
-    if (!d) { kept++; return true; }           // unparseable → keep (safe default)
+    if (!d) { kept++; return true; }           // unparseable â†’ keep (safe default)
     if (d >= windowStart && d < windowEnd) { kept++; return true; }
     dropped++; return false;
   });
@@ -187,14 +187,14 @@ function filterByWindow(rows, dateColIdx, windowStart, windowEnd) {
 function sumCol(rows, idx) {
   if (idx < 0) return 0;
   return rows.reduce((s, r) => {
-    const v = parseFloat(String(r[idx] ?? '').replace(/[₹,\s]/g, ''));
+    const v = parseFloat(String(r[idx] ?? '').replace(/[â‚¹,\s]/g, ''));
     return s + (isNaN(v) ? 0 : v);
   }, 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AGENT AGGREGATION — derived from All Collections Emp column
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// AGENT AGGREGATION â€” derived from All Collections Emp column
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildEmpAgg(cableHeaders, cableData) {
   const empAgg = {};
@@ -202,12 +202,12 @@ function buildEmpAgg(cableHeaders, cableData) {
   const empIdx = cableHeaders.findIndex(h => /^emp$/i.test(h.trim()));
   const amtIdx = cableHeaders.findIndex(h => /^amount$|^amt$/i.test(h));
   const bbIdx  = cableHeaders.findIndex(h => /broadband.*user|bb.*user/i.test(h));
-  console.log('  Agent cols — Emp:' + empIdx + ' Amount:' + amtIdx + ' BBUserID:' + bbIdx);
-  if (empIdx < 0) { console.log('  [Agent] Emp column not found — skipping'); return empAgg; }
+  console.log('  Agent cols â€” Emp:' + empIdx + ' Amount:' + amtIdx + ' BBUserID:' + bbIdx);
+  if (empIdx < 0) { console.log('  [Agent] Emp column not found â€” skipping'); return empAgg; }
   for (const row of cableData) {
     const name = (row[empIdx + 1] ?? '').trim();
     if (!name) continue;
-    const amt  = parseFloat(String(row[amtIdx + 1] ?? '').replace(/[₹,\s]/g, '')) || 0;
+    const amt  = parseFloat(String(row[amtIdx + 1] ?? '').replace(/[â‚¹,\s]/g, '')) || 0;
     const isBB = bbIdx >= 0 && (row[bbIdx + 1] ?? '').trim().length > 0;
     if (!empAgg[name]) empAgg[name] = { customers: 0, digitalTV: 0, broadband: 0 };
     empAgg[name].customers++;
@@ -217,12 +217,12 @@ function buildEmpAgg(cableHeaders, cableData) {
   return empAgg;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CABLE — LOGIN / LOGOUT
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// CABLE â€” LOGIN / LOGOUT
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function solveCaptcha(page) {
-  // Screenshot just the CAPTCHA image element → send to Claude Vision
+  // Screenshot just the CAPTCHA image element â†’ send to Claude Vision
   const imgEl = await page.$('#imgCaptcha');
   if (!imgEl) { console.log('    CAPTCHA element not found'); return null; }
   const imgBuf = await imgEl.screenshot();
@@ -274,7 +274,7 @@ async function cableLogin(page, account) {
       // Also handle browser-level dialog
       page.once('dialog', d => d.dismiss().catch(() => {}));
       await page.waitForTimeout(500);
-      console.log(`  [${account}] Logged in ✓`);
+      console.log(`  [${account}] Logged in âœ“`);
       return;
     }
     console.log(`  [${account}] Attempt ${attempt} failed, retrying...`);
@@ -285,7 +285,7 @@ async function cableLogin(page, account) {
 }
 
 async function cableLogout(page) {
-  // Clear all session state — cookies, localStorage, sessionStorage
+  // Clear all session state â€” cookies, localStorage, sessionStorage
   await page.context().clearCookies();
   await page.evaluate(() => {
     try { localStorage.clear(); } catch(_) {}
@@ -296,20 +296,20 @@ async function cableLogout(page) {
   await page.goto(CABLE_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 15000 });
   await page.waitForURL(url => url.toString() === CABLE_LOGIN_URL || url.toString().startsWith(CABLE_LOGIN_URL), { timeout: 10000 }).catch(() => {});
   await page.waitForSelector('input#uname', { timeout: 10000 });
-  console.log(`  Session cleared ✓ — on login page`);
+  console.log(`  Session cleared âœ“ â€” on login page`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CABLE — SCRAPE COLLECTIONS
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// CABLE â€” SCRAPE COLLECTIONS
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function scrapeCollections(page, account, fromDate, toDate) {
-  console.log(`  [${account}] Collections ${fromDate} → ${toDate}`);
+  console.log(`  [${account}] Collections ${fromDate} â†’ ${toDate}`);
   await page.goto(CABLE_COLL_URL, { waitUntil: 'networkidle', timeout: 30000 });
 
   // Redirected to login? Skip this account.
   if (await page.isVisible('input#uname').catch(() => false)) {
-    console.log(`  [${account}] Redirected to login — skipping`);
+    console.log(`  [${account}] Redirected to login â€” skipping`);
     return { headers: [], rows: [] };
   }
 
@@ -358,7 +358,7 @@ async function scrapeCollections(page, account, fromDate, toDate) {
     allRows.push(...rows);
     console.log(`    Page ${pageNum}: ${rows.length} rows`);
 
-    // Next page — MagikDigi uses /reports/allcollections/OFFSET URLs
+    // Next page â€” MagikDigi uses /reports/allcollections/OFFSET URLs
     // Find the > link href and navigate to it directly
     const nextUrl = await page.evaluate(() => {
       for (const a of document.querySelectorAll('a')) {
@@ -394,9 +394,9 @@ async function scrapeCollections(page, account, fromDate, toDate) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// KERALA VISION — LOGIN + SCRAPE
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// KERALA VISION â€” LOGIN + SCRAPE
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function kvLogin(page, credentials) {
   // Go directly to the partner login page (PortalLogin.aspx)
@@ -408,7 +408,7 @@ async function kvLogin(page, credentials) {
     document.body.innerText.toLowerCase().includes('blocked') ||
     document.body.innerText.toLowerCase().includes('too many')
   );
-  if (blocked) throw new Error('KV partner account locked — too many failed attempts. Unblock at portal admin first.');
+  if (blocked) throw new Error('KV partner account locked â€” too many failed attempts. Unblock at portal admin first.');
 
   for (let attempt = 1; attempt <= 4; attempt++) {
     await page.fill('#txtUserName', credentials.user);
@@ -447,10 +447,10 @@ async function kvLogin(page, credentials) {
         }
       }).catch(() => {});
       await page.waitForTimeout(500);
-      console.log('  [KV] Logged in ✓');
+      console.log('  [KV] Logged in âœ“');
       return;
     }
-    // Still on login — reload and retry
+    // Still on login â€” reload and retry
     await page.goto(partnerLoginUrl, { waitUntil: 'networkidle', timeout: 15000 });
   }
   throw new Error('KV login failed after 4 attempts');
@@ -490,7 +490,7 @@ async function scrapeKV(page, dateRange, credentials) {
   const reportUrl = page.url();
   console.log(`  [KV] Report URL: ${reportUrl}`);
   if (reportUrl.includes('Login.aspx') || reportUrl.includes('Default.aspx') || reportUrl.includes('PortalLogin.aspx')) {
-    throw new Error(`KV redirected to login — session lost. URL: ${reportUrl}`);
+    throw new Error(`KV redirected to login â€” session lost. URL: ${reportUrl}`);
   }
 
   // Dump text inputs to confirm we're on the report page and find date field IDs
@@ -499,10 +499,10 @@ async function scrapeKV(page, dateRange, credentials) {
   );
   console.log('  [KV] Text inputs on report page:', JSON.stringify(inputInfo));
 
-  // Fill date fields — target KV-specific date inputs only (not buttons)
+  // Fill date fields â€” target KV-specific date inputs only (not buttons)
   const filled = await page.evaluate(([fromVal, toVal]) => {
     const result = {from: false, to: false, fromId: '', toId: ''};
-    // KV portal uses these specific field IDs — target them directly first
+    // KV portal uses these specific field IDs â€” target them directly first
     const knownFrom = ['ContentPlaceHolder1_txtStartDate', 'txtStartDate'];
     const knownTo   = ['ContentPlaceHolder1_txtEndDate',   'txtEndDate'];
     for (const fid of knownFrom) {
@@ -532,7 +532,7 @@ async function scrapeKV(page, dateRange, credentials) {
     return result;
   }, [dateRange.fromKV, dateRange.toKV]);
   console.log(`  [KV] Date fill: from=${filled.from}(${filled.fromId}) to=${filled.to}(${filled.toId})`);
-  console.log(`  [KV] Date range: ${dateRange.fromKV} → ${dateRange.toKV}`);
+  console.log(`  [KV] Date range: ${dateRange.fromKV} â†’ ${dateRange.toKV}`);
 
   // Click Show/Search button
   const btnClicked = await page.evaluate(() => {
@@ -546,7 +546,7 @@ async function scrapeKV(page, dateRange, credentials) {
   await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(2000);
 
-  // Set 500 records per page — scan all <select> for a page-size dropdown and fire ASP.NET postback
+  // Set 500 records per page â€” scan all <select> for a page-size dropdown and fire ASP.NET postback
   const psResult = await page.evaluate(() => {
     for (const sel of document.querySelectorAll('select')) {
       const opts = Array.from(sel.options).map(o => ({ val: o.value, num: Number(o.value) || Number(o.text) }));
@@ -566,11 +566,11 @@ async function scrapeKV(page, dateRange, credentials) {
     return null;
   });
   if (psResult) {
-    console.log(`  [KV] Page size → ${psResult}`);
+    console.log(`  [KV] Page size â†’ ${psResult}`);
     await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
     await page.waitForTimeout(1500);
   } else {
-    console.log(`  [KV] Page size dropdown not found — using portal default`);
+    console.log(`  [KV] Page size dropdown not found â€” using portal default`);
   }
 
   // Paginate
@@ -597,7 +597,7 @@ async function scrapeKV(page, dateRange, credentials) {
     pageNum++;
   }
 
-  // ── Post-filter: Dr rows, non-zero PlanCost, within time window ──────────
+  // â”€â”€ Post-filter: Dr rows, non-zero PlanCost, within time window â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const txIdx   = kvHeaders.findIndex(h => /trans.*type|type/i.test(h));
   const pcIdx   = kvHeaders.findIndex(h => /plan.?cost|plancost/i.test(h));
   const amtIdx  = pcIdx >= 0 ? pcIdx : kvHeaders.findIndex(h => /amount|amt/i.test(h));
@@ -609,7 +609,7 @@ async function scrapeKV(page, dateRange, credentials) {
   const filtered = allRows.filter(row => {
     const type = txIdx>=0 ? String(row[txIdx]??'').trim() : 'Dr';
     if (!/^dr$/i.test(type)) { dropCr++; return false; }
-    const amt = parseFloat(String(row[amtIdx]??'').replace(/[₹,\s]/g,''));
+    const amt = parseFloat(String(row[amtIdx]??'').replace(/[â‚¹,\s]/g,''));
     if (isNaN(amt)||amt<=0) { dropZero++; return false; }
     if (windowStart && windowEnd && dateIdx>=0) {
       const d = parseDate(row[dateIdx]??'');
@@ -621,9 +621,9 @@ async function scrapeKV(page, dateRange, credentials) {
   return { headers: kvHeaders, rows: filtered, amtIdx };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GMAIL — HDFC UPI CREDIT READING
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GMAIL â€” HDFC UPI CREDIT READING
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function parseHdfcText(text, date) {
   if (!text) return null;
@@ -671,7 +671,7 @@ async function readHdfcEmails(dateRange) {
     await client.connect();
     const lock = await client.getMailboxLock('INBOX');
     try {
-      // IMAP SINCE is day-level — start from day before window to catch 18:00 boundary
+      // IMAP SINCE is day-level â€” start from day before window to catch 18:00 boundary
       const sinceDate = new Date(dateRange.windowStart);
       sinceDate.setHours(0, 0, 0, 0);
 
@@ -703,7 +703,7 @@ async function readHdfcEmails(dateRange) {
           const payment = parseHdfcText(text + '\n' + subj, emailDate);
           if (payment) {
             payments.push(payment);
-            console.log(`    UPI ₹${payment.amount} → a/c ...${payment.account} ref:${payment.upiRef||'—'} sender:${payment.sender||'—'}`);
+            console.log(`    UPI â‚¹${payment.amount} â†’ a/c ...${payment.account} ref:${payment.upiRef||'â€”'} sender:${payment.sender||'â€”'}`);
           }
         }
       }
@@ -730,9 +730,9 @@ function aggregateUpi(payments) {
   return byAccount;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // EMAIL
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildEmail({ dateRange, perAccount, cableData, cableTotal,
                       kvData, kvHeaders, kvAmtIdx, kvTotal, grandTotal,
@@ -758,11 +758,11 @@ function buildEmail({ dateRange, perAccount, cableData, cableTotal,
       <td style="${td}">${get(row,kvColDate)}</td>
       <td style="${td}">${get(row,kvColUser)}</td>
       <td style="${td}">${get(row,kvColPlan)}</td>
-      <td style="${td};text-align:right">${inr(parseFloat(String(get(row,kvAmtIdx)).replace(/[₹,\s]/g,''))||0)}</td>
+      <td style="${td};text-align:right">${inr(parseFloat(String(get(row,kvAmtIdx)).replace(/[â‚¹,\s]/g,''))||0)}</td>
     </tr>`;
   }
   if (kvData.length>20) kvRows+=`<tr><td colspan="4" style="${td};color:#888;font-style:italic">
-    …${kvData.length-20} more in CSV</td></tr>`;
+    â€¦${kvData.length-20} more in CSV</td></tr>`;
 
   // Agent section
   let agentSection = '';
@@ -786,7 +786,7 @@ function buildEmail({ dateRange, perAccount, cableData, cableTotal,
       <td style="padding:8px 12px;color:#fff;text-align:right;font-weight:bold">${inr(totD+totB)}</td></tr>`;
     agentSection = `
     <h3 style="color:#1a3a5c;margin:20px 0 8px;font-size:15px">
-      👤 Agent Collections</h3>
+      ðŸ‘¤ Agent Collections</h3>
     <table width="100%" cellspacing="0" style="border:1px solid #dde3ea;border-radius:6px;overflow:hidden;margin-bottom:20px">
       <thead><tr>
         <th style="${th}">Agent</th><th style="${th};text-align:center">Customers</th>
@@ -814,7 +814,7 @@ function buildEmail({ dateRange, perAccount, cableData, cableTotal,
     upiAcctRows = `<tr><td colspan="3" style="${td};color:#888;font-style:italic">No UPI credits in this window</td></tr>`;
   }
   const upiSection = `
-    <h3 style="color:#1a3a5c;margin:20px 0 8px;font-size:15px">💳 UPI Received (HDFC)</h3>
+    <h3 style="color:#1a3a5c;margin:20px 0 8px;font-size:15px">ðŸ’³ UPI Received (HDFC)</h3>
     <table width="100%" cellspacing="0" style="border:1px solid #dde3ea;border-radius:6px;overflow:hidden;margin-bottom:16px">
       <thead><tr>
         <th style="${th}">Account</th>
@@ -831,7 +831,7 @@ function buildEmail({ dateRange, perAccount, cableData, cableTotal,
     <table width="100%" cellspacing="0" style="margin-bottom:24px">
       <tr>
         <td style="padding:14px 16px;background:#e8f5e9;border-radius:6px;border:1px solid #c8e6c9">
-          <div style="font-size:12px;color:#2e7d32">💰 Cash in Hand (Grand − UPI)</div>
+          <div style="font-size:12px;color:#2e7d32">ðŸ’° Cash in Hand (Grand âˆ’ UPI)</div>
           <div style="font-size:24px;font-weight:bold;color:#1b5e20">${inr(cashInHand)}</div>
         </td>
       </tr>
@@ -848,12 +848,12 @@ function buildEmail({ dateRange, perAccount, cableData, cableTotal,
     <table width="100%" cellspacing="0" style="margin-bottom:8px">
       <tr>
         <td style="padding:16px;background:#f5f9ff;border-right:1px solid #dde3ea">
-          <div style="font-size:12px;color:#666">📡 Cable Total</div>
+          <div style="font-size:12px;color:#666">ðŸ“¡ Cable Total</div>
           <div style="font-size:22px;font-weight:bold;color:#1a3a5c">${inr(cableTotal)}</div>
           <div style="font-size:12px;color:#888">${cableData.length} records</div>
         </td>
         <td style="padding:16px;background:#eef4fb;border-right:1px solid #dde3ea">
-          <div style="font-size:12px;color:#666">🌐 Internet (MRP)</div>
+          <div style="font-size:12px;color:#666">ðŸŒ Internet (MRP)</div>
           <div style="font-size:22px;font-weight:bold;color:#1a3a5c">${inr(kvTotal)}</div>
           <div style="font-size:12px;color:#888">${kvData.length} records</div>
         </td>
@@ -868,20 +868,20 @@ function buildEmail({ dateRange, perAccount, cableData, cableTotal,
     <table width="100%" cellspacing="0" style="margin-bottom:24px">
       <tr>
         <td style="padding:14px 16px;background:#fff8e1;border-right:1px solid #dde3ea;border-top:1px solid #dde3ea">
-          <div style="font-size:12px;color:#666">💳 UPI Received</div>
+          <div style="font-size:12px;color:#666">ðŸ’³ UPI Received</div>
           <div style="font-size:20px;font-weight:bold;color:#e65100">${inr(upiTotal)}</div>
           <div style="font-size:12px;color:#888">${upiAcctEntries.reduce((s,[,v])=>s+v.count,0)} payments</div>
         </td>
         <td style="padding:14px 16px;background:#e8f5e9;border-top:1px solid #dde3ea">
-          <div style="font-size:12px;color:#2e7d32">💰 Cash in Hand</div>
+          <div style="font-size:12px;color:#2e7d32">ðŸ’° Cash in Hand</div>
           <div style="font-size:20px;font-weight:bold;color:#1b5e20">${inr(cashInHand)}</div>
-          <div style="font-size:12px;color:#888">Grand − UPI</div>
+          <div style="font-size:12px;color:#888">Grand âˆ’ UPI</div>
         </td>
       </tr>
     </table>
 
     <!-- Cable -->
-    <h3 style="color:#1a3a5c;margin:0 0 8px;font-size:15px">📡 Cable Collections (MagikDigi)</h3>
+    <h3 style="color:#1a3a5c;margin:0 0 8px;font-size:15px">ðŸ“¡ Cable Collections (MagikDigi)</h3>
     <table width="100%" cellspacing="0" style="border:1px solid #dde3ea;border-radius:6px;overflow:hidden;margin-bottom:24px">
       <thead><tr>
         <th style="${th}">Account</th><th style="${th}">Records</th>
@@ -896,7 +896,7 @@ function buildEmail({ dateRange, perAccount, cableData, cableTotal,
     </table>
 
     <!-- Kerala Vision -->
-    <h3 style="color:#1a3a5c;margin:0 0 8px;font-size:15px">🌐 Internet (Kerala Vision) — PlanCost MRP</h3>
+    <h3 style="color:#1a3a5c;margin:0 0 8px;font-size:15px">ðŸŒ Internet (Kerala Vision) â€” PlanCost MRP</h3>
     <table width="100%" cellspacing="0" style="border:1px solid #dde3ea;border-radius:6px;overflow:hidden;margin-bottom:24px">
       <thead><tr>
         <th style="${th}">Date</th><th style="${th}">User ID</th>
@@ -906,7 +906,7 @@ function buildEmail({ dateRange, perAccount, cableData, cableTotal,
       <tfoot><tr style="background:#1a3a5c">
         <td colspan="2" style="padding:8px 12px;color:#fff;font-weight:bold">Total</td>
         <td style="padding:8px 12px;color:#fff;font-weight:bold;text-align:right">${inr(kvTotal)}</td>
-        <td style="padding:8px 12px;color:#a8d4f0;font-size:12px">${kvData.length} records (all accounts) — full data in CSV</td>
+        <td style="padding:8px 12px;color:#a8d4f0;font-size:12px">${kvData.length} records (all accounts) â€” full data in CSV</td>
       </tr></tfoot>
     </table>
 
@@ -922,11 +922,11 @@ async function sendEmail(data) {
     host: 'smtp.gmail.com', port: 587, secure: false,
     auth: { user: EMAIL_FROM, pass: GMAIL_APP_PASSWORD },
   });
-  const subject = `Aradhana Collections — ${data.dateRange.subject}`;
+  const subject = `Aradhana Collections â€” ${data.dateRange.subject}`;
   const html    = buildEmail(data);
   const cashInHand = data.grandTotal - (data.upiTotal || 0);
   const text    = [
-    `Aradhana Collections — ${data.dateRange.label}`,
+    `Aradhana Collections â€” ${data.dateRange.label}`,
     `Cable Total:    ${inr(data.cableTotal)} (${data.cableData.length} records)`,
     `Internet Total: ${inr(data.kvTotal)} (${data.kvData.length} records)`,
     `Grand Total:    ${inr(data.grandTotal)}`,
@@ -938,37 +938,37 @@ async function sendEmail(data) {
     to: EMAIL_TO, subject, html, text,
     attachments: [{ filename: 'collections_today.csv', path: CSV_PATH }],
   });
-  console.log(`\nEmail sent → ${EMAIL_TO} ✓`);
+  console.log(`\nEmail sent â†’ ${EMAIL_TO} âœ“`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // WHATSAPP (Desktop app via whatsapp:// URL scheme)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildWhatsAppMsg({ dateRange, perAccount, cableTotal, kvTotal, grandTotal,
                             cableData, kvData, empAgg, upiByAccount, upiTotal }) {
   const lines = [
     `*Aradhana Collections*`,
     dateRange.label, ``,
-    `📡 *Cable (MagikDigi)*`,
+    `ðŸ“¡ *Cable (MagikDigi)*`,
   ];
   for (const [acc,v] of Object.entries(perAccount)) {
     if (v.count>0) lines.push(`  ${acc}: ${inr(v.amount)} (${v.count})`);
   }
   lines.push(`  *Total: ${inr(cableTotal)}* (${cableData.length} records)`, ``);
-  lines.push(`🌐 *Internet (Kerala Vision)* — MRP`);
+  lines.push(`ðŸŒ *Internet (Kerala Vision)* â€” MRP`);
   lines.push(`  ${inr(kvTotal)} (${kvData.length} records)`, ``);
-  lines.push(`💰 *Grand Total: ${inr(grandTotal)}* (${cableData.length+kvData.length} records)`);
+  lines.push(`ðŸ’° *Grand Total: ${inr(grandTotal)}* (${cableData.length+kvData.length} records)`);
 
   const agents = Object.entries(empAgg||{}).filter(([,v])=>v.customers>0);
   if (agents.length) {
-    lines.push(``, `👤 *Agent Collections*`);
+    lines.push(``, `ðŸ‘¤ *Agent Collections*`);
     for (const [name,v] of agents)
       lines.push(`  ${name}: ${inr(v.digitalTV+v.broadband)} (${v.customers} cust)`);
   }
 
   const upiEntries = Object.entries(upiByAccount || {});
-  lines.push(``, `💳 *UPI Received (HDFC)*`);
+  lines.push(``, `ðŸ’³ *UPI Received (HDFC)*`);
   if (upiEntries.length) {
     for (const [acct, v] of upiEntries) {
       const label = HDFC_ACCOUNTS[acct] || `Account ${acct}`;
@@ -978,7 +978,7 @@ function buildWhatsAppMsg({ dateRange, perAccount, cableTotal, kvTotal, grandTot
     lines.push(`  No UPI credits`);
   }
   lines.push(`  *Total UPI: ${inr(upiTotal || 0)}*`);
-  lines.push(``, `💵 *Cash in Hand: ${inr(grandTotal - (upiTotal || 0))}*`);
+  lines.push(``, `ðŸ’µ *Cash in Hand: ${inr(grandTotal - (upiTotal || 0))}*`);
 
   return lines.join('\n');
 }
@@ -988,17 +988,17 @@ async function sendWhatsApp(message, phone) {
   const tmpFile = path.join(require('os').tmpdir(), 'aradhana_wa.txt');
   fs.writeFileSync(tmpFile, message, 'utf8');
   const tmpPs = tmpFile.replace(/\\/g,'\\\\');
-  console.log(`\n── WhatsApp → ${phone} ──`);
+  console.log(`\nâ”€â”€ WhatsApp â†’ ${phone} â”€â”€`);
 
   const ps = `
 $ErrorActionPreference = 'SilentlyContinue'
 $msg = [System.IO.File]::ReadAllText('${tmpPs}', [System.Text.Encoding]::UTF8)
 
-# Put full message on clipboard — avoids whatsapp:// URL length limit
+# Put full message on clipboard â€” avoids whatsapp:// URL length limit
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Clipboard]::SetText($msg)
 
-# Open WhatsApp to the contact — no text in URL so nothing gets truncated
+# Open WhatsApp to the contact â€” no text in URL so nothing gets truncated
 Start-Process "whatsapp://send?phone=${phone}"
 Start-Sleep -Seconds 10
 
@@ -1074,24 +1074,24 @@ if(-not $sent){
 
   const r = spawnSync('powershell',['-NoProfile','-NonInteractive','-Command',ps],{timeout:55000,encoding:'utf8'});
   const out = (r.stdout||'')+(r.stderr||'');
-  if (out.includes('SENT_UIA'))  console.log('  [WA] Sent via UIAutomation ✓');
-  else if (out.includes('SENT_KEY')) console.log('  [WA] Sent via keybd_event ✓');
+  if (out.includes('SENT_UIA'))  console.log('  [WA] Sent via UIAutomation âœ“');
+  else if (out.includes('SENT_KEY')) console.log('  [WA] Sent via keybd_event âœ“');
   else if (out.includes('NOT_FOUND')) console.log('  [WA] WhatsApp not running');
   else console.log(`  [WA] Result: ${out.trim().slice(0,200)}`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MAIN
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function main() {
   const DR = getDateRange();
-  console.log(`\n${'═'.repeat(54)}`);
+  console.log(`\n${'â•'.repeat(54)}`);
   console.log(`  Aradhana Collections Scraper`);
   console.log(`  Window: ${DR.label}`);
-  console.log(`${'═'.repeat(54)}\n`);
+  console.log(`${'â•'.repeat(54)}\n`);
 
-  // ── Chrome browser — MagikDigi cable scraping ─────────────────────────────
+  // â”€â”€ Chrome browser â€” MagikDigi cable scraping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const browser = await chromium.launch({
     headless: !HEADED,
     executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -1100,7 +1100,7 @@ async function main() {
   const ctx  = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();
 
-  // ── PART 1: Cable accounts ─────────────────────────────────────────────────
+  // â”€â”€ PART 1: Cable accounts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const cableHeaders = [];
   const cableData    = [];            // [account, ...row]
   const perAccount   = {};
@@ -1110,11 +1110,11 @@ async function main() {
     for (const acc of CABLE_ACCOUNTS) perAccount[acc]={count:0,amount:0};
   } else {
     for (const acc of CABLE_ACCOUNTS) {
-      console.log(`\n── Cable: ${acc} ──`);
+      console.log(`\nâ”€â”€ Cable: ${acc} â”€â”€`);
       try {
         await cableLogin(page, acc);
 
-        // Collections — portal filters by date, we filter by time in code
+        // Collections â€” portal filters by date, we filter by time in code
         const { headers, rows: rawRows } = await scrapeCollections(page, acc, DR.fromDMY, DR.toDMY);
         if (headers.length && !cableHeaders.length) {
           cableHeaders.push(...headers);
@@ -1130,7 +1130,7 @@ async function main() {
         perAccount[acc] = { count: rows.length, amount };
         console.log(`  [${acc}] ${rows.length} rows  ${inr(amount)}`);
 
-        // Explicit logout — wait for redirect back to login page before next account
+        // Explicit logout â€” wait for redirect back to login page before next account
         await cableLogout(page);
       } catch(e) {
         console.error(`  [${acc}] FAILED: ${e.message}`);
@@ -1151,16 +1151,16 @@ async function main() {
       console.log('    ' + name + ': ' + v.customers + ' collections  DTV:' + inr(v.digitalTV) + '  BB:' + inr(v.broadband));
   }
 
-  // ── Close Chrome (cable) then reopen for Kerala Vision ────────────────────
+  // â”€â”€ Close Chrome (cable) then reopen for Kerala Vision â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   await browser.close();
 
-  // ── PART 2: Kerala Vision — all accounts ─────────────────────────────────
-  console.log(`\n── Kerala Vision Broadband ──`);
+  // â”€â”€ PART 2: Kerala Vision â€” all accounts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  console.log(`\nâ”€â”€ Kerala Vision Broadband â”€â”€`);
   let kvHeaders=[]; const kvData=[]; let kvTotal=0; let kvAmtIdx=0;
   const kvPerAccount = {};
 
   for (const kvCred of KV_ACCOUNTS) {
-    console.log(`\n── KV: ${kvCred.user} ──`);
+    console.log(`\nâ”€â”€ KV: ${kvCred.user} â”€â”€`);
     const kvBrowser = await chromium.launch({
       headless: !HEADED,
       executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -1185,21 +1185,21 @@ async function main() {
   }
   const grandTotal = cableTotal + kvTotal;
 
-  // ── PART 3: Gmail — HDFC UPI credits ──────────────────────────────────────
-  console.log(`\n── HDFC UPI Credits (Gmail) ──`);
+  // â”€â”€ PART 3: Gmail â€” HDFC UPI credits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  console.log(`\nâ”€â”€ HDFC UPI Credits (Gmail) â”€â”€`);
   const upiPayments   = await readHdfcEmails(DR);
   const upiByAccount  = aggregateUpi(upiPayments);
   const upiTotal      = upiPayments.reduce((s, p) => s + p.amount, 0);
   const cashInHand    = grandTotal - upiTotal;
 
-  // ── Save CSV ───────────────────────────────────────────────────────────────
+  // â”€â”€ Save CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const csvLines = [];
-  csvLines.push([`=== CABLE COLLECTIONS — ${DR.label} ===`]);
+  csvLines.push([`=== CABLE COLLECTIONS â€” ${DR.label} ===`]);
   if (cableHeaders.length) csvLines.push(['Account',...cableHeaders]);
   for (const row of cableData) csvLines.push(row);
   csvLines.push([]);
 
-  csvLines.push([`=== KERALA VISION — ${DR.fromKV} → ${DR.toKV} (Dr, PlanCost MRP) ===`]);
+  csvLines.push([`=== KERALA VISION â€” ${DR.fromKV} â†’ ${DR.toKV} (Dr, PlanCost MRP) ===`]);
   if (kvHeaders.length) csvLines.push(['KVISION',...kvHeaders]);
   for (const row of kvData) csvLines.push(['KVISION',...row]);
   csvLines.push([]);
@@ -1213,7 +1213,7 @@ async function main() {
   }
 
   if (upiPayments.length) {
-    csvLines.push([`=== HDFC UPI CREDITS — ${DR.label} ===`]);
+    csvLines.push([`=== HDFC UPI CREDITS â€” ${DR.label} ===`]);
     csvLines.push(['Date','Account','Amount','UPI Ref','Sender','VPA']);
     for (const p of upiPayments)
       csvLines.push([p.date.toLocaleString(), p.account, p.amount.toFixed(2), p.upiRef, p.sender, p.vpa]);
@@ -1221,7 +1221,7 @@ async function main() {
   }
 
   csvLines.push(['=== SUMMARY ===']);
-  csvLines.push(['Source','Records','Amount (₹)']);
+  csvLines.push(['Source','Records','Amount (â‚¹)']);
   for (const [acc,v] of Object.entries(perAccount)) csvLines.push([acc, v.count, v.amount.toFixed(2)]);
   csvLines.push(['Cable Total', cableData.length, cableTotal.toFixed(2)]);
   csvLines.push(['Internet (KV)', kvData.length, kvTotal.toFixed(2)]);
@@ -1230,42 +1230,42 @@ async function main() {
   csvLines.push(['Cash in Hand', '', cashInHand.toFixed(2)]);
 
   fs.writeFileSync(CSV_PATH, csvLines.map(r=>r.map(escapeCSV).join(',')).join('\n'), 'utf8');
-  console.log(`\nSaved → ${CSV_PATH}`);
+  console.log(`\nSaved â†’ ${CSV_PATH}`);
 
-  // ── Console report ─────────────────────────────────────────────────────────
-  console.log(`\n${'═'.repeat(54)}`);
-  console.log(`  FINAL REPORT — ${DR.label}`);
-  console.log(`${'═'.repeat(54)}`);
-  console.log(`\n  📡 Cable (MagikDigi)`);
+  // â”€â”€ Console report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  console.log(`\n${'â•'.repeat(54)}`);
+  console.log(`  FINAL REPORT â€” ${DR.label}`);
+  console.log(`${'â•'.repeat(54)}`);
+  console.log(`\n  ðŸ“¡ Cable (MagikDigi)`);
   for (const [acc,v] of Object.entries(perAccount)) {
-    const s = v.count>0 ? `${inr(v.amount).padStart(13)}   (${v.count})` : `${'₹0.00'.padStart(13)}   (no collections)`;
+    const s = v.count>0 ? `${inr(v.amount).padStart(13)}   (${v.count})` : `${'â‚¹0.00'.padStart(13)}   (no collections)`;
     console.log(`    ${acc}:  ${s}`);
   }
-  console.log(`    ${'─'.repeat(44)}`);
+  console.log(`    ${'â”€'.repeat(44)}`);
   console.log(`    Cable Total:  ${inr(cableTotal).padStart(13)}   (${cableData.length} records)\n`);
-  console.log(`  🌐 Internet (Kerala Vision) — PlanCost MRP`);
+  console.log(`  ðŸŒ Internet (Kerala Vision) â€” PlanCost MRP`);
   for (const [acc, v] of Object.entries(kvPerAccount)) {
-    const s = v.count > 0 ? `${inr(v.amount).padStart(13)}   (${v.count})` : `${'₹0.00'.padStart(13)}   (no records)`;
+    const s = v.count > 0 ? `${inr(v.amount).padStart(13)}   (${v.count})` : `${'â‚¹0.00'.padStart(13)}   (no records)`;
     console.log(`    ${acc}:  ${s}`);
   }
-  console.log(`    ${'─'.repeat(44)}`);
+  console.log(`    ${'â”€'.repeat(44)}`);
   console.log(`    KV Total:     ${inr(kvTotal).padStart(13)}   (${kvData.length} records)`);
 
   if (Object.keys(empAgg).length) {
-    console.log(`\n  👤 Agent Collections`);
+    console.log(`\n  ðŸ‘¤ Agent Collections`);
     const nw = Math.max(20,...Object.keys(empAgg).map(n=>n.length));
     console.log(`    ${'Agent'.padEnd(nw)}  Cust  Digital TV      Broadband       Total`);
-    console.log(`    ${'─'.repeat(nw+52)}`);
+    console.log(`    ${'â”€'.repeat(nw+52)}`);
     let tc=0,td=0,tb=0;
     for (const [name,v] of Object.entries(empAgg)) {
       const tot=v.digitalTV+v.broadband;
       console.log(`    ${name.padEnd(nw)}  ${String(v.customers).padStart(4)}  ${inr(v.digitalTV).padStart(12)}  ${inr(v.broadband).padStart(12)}  ${inr(tot).padStart(12)}`);
       tc+=v.customers; td+=v.digitalTV; tb+=v.broadband;
     }
-    console.log(`    ${'─'.repeat(nw+52)}`);
+    console.log(`    ${'â”€'.repeat(nw+52)}`);
     console.log(`    ${'TOTAL'.padEnd(nw)}  ${String(tc).padStart(4)}  ${inr(td).padStart(12)}  ${inr(tb).padStart(12)}  ${inr(td+tb).padStart(12)}`);
   }
-  console.log(`\n  💳 UPI Received (HDFC)`);
+  console.log(`\n  ðŸ’³ UPI Received (HDFC)`);
   const upiEntries = Object.entries(upiByAccount);
   if (upiEntries.length) {
     for (const [acct, v] of upiEntries) {
@@ -1275,16 +1275,16 @@ async function main() {
   } else {
     console.log(`    No UPI credits in this window`);
   }
-  console.log(`    ${'─'.repeat(44)}`);
+  console.log(`    ${'â”€'.repeat(44)}`);
   console.log(`    UPI Total:    ${inr(upiTotal).padStart(13)}`);
 
-  console.log(`\n${'─'.repeat(54)}`);
+  console.log(`\n${'â”€'.repeat(54)}`);
   console.log(`  GRAND TOTAL:  ${inr(grandTotal).padStart(13)}   (${cableData.length+kvData.length} records)`);
   console.log(`  UPI Received: ${inr(upiTotal).padStart(13)}`);
   console.log(`  CASH IN HAND: ${inr(cashInHand).padStart(13)}`);
-  console.log(`${'═'.repeat(54)}\n`);
+  console.log(`${'â•'.repeat(54)}\n`);
 
-  // ── Email + WhatsApp ───────────────────────────────────────────────────────
+  // â”€â”€ Email + WhatsApp â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   await sendEmail({ dateRange:DR, perAccount, cableData, cableTotal,
                     kvData, kvHeaders, kvAmtIdx, kvTotal, grandTotal,
                     cableHeaders, empAgg, upiByAccount, upiTotal });
