@@ -47,8 +47,12 @@ const CABLE_PASSWORD   = 'Aradhana@123#';
 const KV_BASE       = 'https://operator.keralavisionisp.com/Partner';
 const KV_LOGIN_URL  = `${KV_BASE}/Default.aspx`;
 const KV_REPORT_URL = `${KV_BASE}/BalTransHist.aspx`;
-const KV_USER       = 'kb02c002';
-const KV_PASS       = 'Aradhana@123';
+const KV_ACCOUNTS = [
+  { user: 'kb02c002', pass: 'Aradhana@123'  },
+  { user: 'KB02C007', pass: 'Aradhana@123'  },
+  { user: 'KB02C017', pass: 'Aradhana@123'  },
+  { user: 'KB02C006', pass: 'KB02c006'      },
+];
 
 // ── Email config ──────────────────────────────────────────────────────────────
 
@@ -391,7 +395,7 @@ async function scrapeCollections(page, account, fromDate, toDate) {
 // KERALA VISION — LOGIN + SCRAPE
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function kvLogin(page) {
+async function kvLogin(page, credentials) {
   // Go directly to the partner login page (PortalLogin.aspx)
   // Default.aspx redirects here anyway; going direct is cleaner
   const partnerLoginUrl = 'https://operator.keralavisionisp.com/Partner/PortalLogin.aspx';
@@ -404,8 +408,8 @@ async function kvLogin(page) {
   if (blocked) throw new Error('KV partner account locked — too many failed attempts. Unblock at portal admin first.');
 
   for (let attempt = 1; attempt <= 4; attempt++) {
-    await page.fill('#txtUserName', KV_USER);
-    await page.fill('#txtPassword', KV_PASS);
+    await page.fill('#txtUserName', credentials.user);
+    await page.fill('#txtPassword', credentials.pass);
 
     // Solve CAPTCHA (#imgCapchanew / #txtLoginCaptcha)
     const capImg = await page.$('#imgCapchanew');
@@ -475,8 +479,8 @@ async function kvScrapePage(page) {
   });
 }
 
-async function scrapeKV(page, dateRange) {
-  await kvLogin(page);
+async function scrapeKV(page, dateRange, credentials) {
+  await kvLogin(page, credentials);
 
   // Navigate to report page
   await page.goto(KV_REPORT_URL, { waitUntil: 'networkidle', timeout: 30000 });
@@ -899,7 +903,7 @@ function buildEmail({ dateRange, perAccount, cableData, cableTotal,
       <tfoot><tr style="background:#1a3a5c">
         <td colspan="2" style="padding:8px 12px;color:#fff;font-weight:bold">Total</td>
         <td style="padding:8px 12px;color:#fff;font-weight:bold;text-align:right">${inr(kvTotal)}</td>
-        <td style="padding:8px 12px;color:#a8d4f0;font-size:12px">${kvData.length} records — full data in CSV</td>
+        <td style="padding:8px 12px;color:#a8d4f0;font-size:12px">${kvData.length} records (all accounts) — full data in CSV</td>
       </tr></tfoot>
     </table>
 
@@ -1147,23 +1151,35 @@ async function main() {
   // ── Close Chrome (cable) then reopen for Kerala Vision ────────────────────
   await browser.close();
 
-  // ── PART 2: Kerala Vision — Chrome ────────────────────────────────────────
+  // ── PART 2: Kerala Vision — all accounts ─────────────────────────────────
   console.log(`\n── Kerala Vision Broadband ──`);
   let kvHeaders=[]; const kvData=[]; let kvTotal=0; let kvAmtIdx=0;
-  const kvBrowser = await chromium.launch({
-    headless: !HEADED,
-    executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    slowMo: HEADED ? 80 : 0,
-  });
-  const kvCtx  = await kvBrowser.newContext({ viewport: { width: 1280, height: 800 } });
-  const kvPage = await kvCtx.newPage();
-  try {
-    const { headers, rows, amtIdx } = await scrapeKV(kvPage, DR);
-    kvHeaders = headers; kvData.push(...rows); kvAmtIdx = amtIdx;
-    kvTotal   = sumCol(rows, amtIdx);
-    console.log(`  [KV] ${rows.length} rows  ${inr(kvTotal)}`);
-  } catch(e) { console.error(`  [KV] FAILED: ${e.message}`); }
-  await kvBrowser.close();
+  const kvPerAccount = {};
+
+  for (const kvCred of KV_ACCOUNTS) {
+    console.log(`\n── KV: ${kvCred.user} ──`);
+    const kvBrowser = await chromium.launch({
+      headless: !HEADED,
+      executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      slowMo: HEADED ? 80 : 0,
+    });
+    const kvCtx  = await kvBrowser.newContext({ viewport: { width: 1280, height: 800 } });
+    const kvPage = await kvCtx.newPage();
+    try {
+      const { headers, rows, amtIdx } = await scrapeKV(kvPage, DR, kvCred);
+      if (headers.length && !kvHeaders.length) kvHeaders = headers;
+      kvData.push(...rows);
+      kvAmtIdx = amtIdx;
+      const acctTotal = sumCol(rows, amtIdx);
+      kvPerAccount[kvCred.user] = { count: rows.length, amount: acctTotal };
+      kvTotal += acctTotal;
+      console.log(`  [KV:${kvCred.user}] ${rows.length} rows  ${inr(acctTotal)}`);
+    } catch(e) {
+      console.error(`  [KV:${kvCred.user}] FAILED: ${e.message}`);
+      kvPerAccount[kvCred.user] = { count: 0, amount: 0 };
+    }
+    await kvBrowser.close();
+  }
   const grandTotal = cableTotal + kvTotal;
 
   // ── PART 3: Gmail — HDFC UPI credits ──────────────────────────────────────
@@ -1225,7 +1241,12 @@ async function main() {
   console.log(`    ${'─'.repeat(44)}`);
   console.log(`    Cable Total:  ${inr(cableTotal).padStart(13)}   (${cableData.length} records)\n`);
   console.log(`  🌐 Internet (Kerala Vision) — PlanCost MRP`);
-  console.log(`    kb02c002:  ${inr(kvTotal).padStart(13)}   (${kvData.length} records)`);
+  for (const [acc, v] of Object.entries(kvPerAccount)) {
+    const s = v.count > 0 ? `${inr(v.amount).padStart(13)}   (${v.count})` : `${'₹0.00'.padStart(13)}   (no records)`;
+    console.log(`    ${acc}:  ${s}`);
+  }
+  console.log(`    ${'─'.repeat(44)}`);
+  console.log(`    KV Total:     ${inr(kvTotal).padStart(13)}   (${kvData.length} records)`);
 
   if (Object.keys(empAgg).length) {
     console.log(`\n  👤 Agent Collections`);
