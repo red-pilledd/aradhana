@@ -1,0 +1,9 @@
+node_modules/
+*.log
+run.log
+console_latest.log
+collections_today.csv
+backup/
+*.tmp
+
+.env
