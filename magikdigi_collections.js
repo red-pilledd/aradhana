@@ -61,7 +61,10 @@ const EMAIL_TO   = 'shabup63@gmail.com';
 
 // ── WhatsApp config ───────────────────────────────────────────────────────────
 
-const WA_PHONE = '918281871096';   // 91 = India country code
+const WA_PHONES = [
+  '918281871096',   // Bibin (Brother)
+  '918907093184',   // second number
+];
 
 // ── HDFC account labels (last 4 digits → display name) ───────────────────────
 // Add Bibin's and Sheeja's account last-4 here once known from the first run
@@ -980,12 +983,12 @@ function buildWhatsAppMsg({ dateRange, perAccount, cableTotal, kvTotal, grandTot
   return lines.join('\n');
 }
 
-async function sendWhatsApp(message) {
+async function sendWhatsApp(message, phone) {
   const { spawnSync } = require('child_process');
   const tmpFile = path.join(require('os').tmpdir(), 'aradhana_wa.txt');
   fs.writeFileSync(tmpFile, message, 'utf8');
   const tmpPs = tmpFile.replace(/\\/g,'\\\\');
-  console.log(`\n── WhatsApp → ${WA_PHONE} ──`);
+  console.log(`\n── WhatsApp → ${phone} ──`);
 
   const ps = `
 $ErrorActionPreference = 'SilentlyContinue'
@@ -996,7 +999,7 @@ Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Clipboard]::SetText($msg)
 
 # Open WhatsApp to the contact — no text in URL so nothing gets truncated
-Start-Process "whatsapp://send?phone=${WA_PHONE}"
+Start-Process "whatsapp://send?phone=${phone}"
 Start-Sleep -Seconds 10
 
 $wa = Get-Process | Where-Object { $_.ProcessName -match 'WhatsApp' -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
@@ -1286,9 +1289,12 @@ async function main() {
                     kvData, kvHeaders, kvAmtIdx, kvTotal, grandTotal,
                     cableHeaders, empAgg, upiByAccount, upiTotal });
 
-  await sendWhatsApp(buildWhatsAppMsg({ dateRange:DR, perAccount, cableTotal,
-                                        kvTotal, grandTotal, cableData, kvData,
-                                        empAgg, upiByAccount, upiTotal }));
+  const waMsg = buildWhatsAppMsg({ dateRange:DR, perAccount, cableTotal,
+                                    kvTotal, grandTotal, cableData, kvData,
+                                    empAgg, upiByAccount, upiTotal });
+  for (const phone of WA_PHONES) {
+    await sendWhatsApp(waMsg, phone);
+  }
   console.log('Done.');
 }
 
