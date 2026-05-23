@@ -63,7 +63,7 @@ const EMAIL_TO   = 'shabup63@gmail.com';
 
 const WA_PHONES = [
   '918281871096',   // Bibin (Brother)
-  '918907093184',   // second number
+  '918907093184',   // Dad (Shanmughadas)
 ];
 
 // ── HDFC account labels (last 4 digits → display name) ───────────────────────
